@@ -1,0 +1,194 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Angry Pigs - Protótipo</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #87ceeb; }
+    canvas { display: block; margin: 0 auto; background: #cfe8fc; }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let pigs = [];
+let birds = [];
+let structures = [];
+let explosions = [];
+let gravity = 0.4;
+
+let sling = {
+  x: 150,
+  y: canvas.height - 150,
+  dragging: false,
+  pig: null
+};
+
+class Pig {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.radius = 20;
+    this.exploded = false;
+  }
+
+  update() {
+    if (!this.exploded) {
+      this.vy += gravity;
+      this.x += this.vx;
+      this.y += this.vy;
+
+      if (this.y + this.radius >= canvas.height || this.hitStructure()) {
+        this.explode();
+      }
+    }
+  }
+
+  draw() {
+    if (!this.exploded) {
+      ctx.beginPath();
+      ctx.fillStyle = "green";
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  explode() {
+    this.exploded = true;
+    explosions.push(new Explosion(this.x, this.y));
+    birds = birds.filter(bird => {
+      let dx = bird.x - this.x;
+      let dy = bird.y - this.y;
+      let dist = Math.sqrt(dx * dx + dy * dy);
+      return dist > 80;
+    });
+  }
+
+  hitStructure() {
+    return structures.some(s => this.x > s.x && this.x < s.x + s.w && this.y + this.radius > s.y);
+  }
+}
+
+class Bird {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 20;
+  }
+
+  draw() {
+    ctx.beginPath();
+    ctx.fillStyle = "red";
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+class Structure {
+  constructor(x, y, w, h) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+  }
+
+  draw() {
+    ctx.fillStyle = "#8b4513";
+    ctx.fillRect(this.x, this.y, this.w, this.h);
+  }
+}
+
+class Explosion {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.radius = 0;
+    this.maxRadius = 80;
+    this.alpha = 1;
+  }
+
+  update() {
+    if (this.radius < this.maxRadius) {
+      this.radius += 10;
+      this.alpha -= 0.05;
+    }
+  }
+
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 165, 0, ${this.alpha})`;
+    ctx.fill();
+  }
+}
+
+function spawnLevel() {
+  birds.push(new Bird(canvas.width - 100, canvas.height - 70));
+  structures.push(new Structure(canvas.width - 120, canvas.height - 50, 40, 50));
+  sling.pig = new Pig(sling.x, sling.y);
+}
+
+function gameLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#654321";
+  ctx.fillRect(sling.x - 5, sling.y, 10, 50);
+
+  if (sling.pig) {
+    sling.pig.update();
+    sling.pig.draw();
+  }
+
+  pigs.forEach(p => {
+    p.update();
+    p.draw();
+  });
+
+  birds.forEach(b => b.draw());
+  structures.forEach(s => s.draw());
+
+  explosions.forEach(e => e.update());
+  explosions.forEach(e => e.draw());
+  explosions = explosions.filter(e => e.radius < e.maxRadius);
+
+  requestAnimationFrame(gameLoop);
+}
+
+canvas.addEventListener("mousedown", e => {
+  if (sling.pig && Math.hypot(e.offsetX - sling.pig.x, e.offsetY - sling.pig.y) < sling.pig.radius) {
+    sling.dragging = true;
+  }
+});
+
+canvas.addEventListener("mousemove", e => {
+  if (sling.dragging) {
+    sling.pig.x = e.offsetX;
+    sling.pig.y = e.offsetY;
+  }
+});
+
+canvas.addEventListener("mouseup", e => {
+  if (sling.dragging) {
+    sling.dragging = false;
+    let dx = sling.x - sling.pig.x;
+    let dy = sling.y - sling.pig.y;
+    sling.pig.vx = dx / 10;
+    sling.pig.vy = dy / 10;
+    pigs.push(sling.pig);
+    sling.pig = new Pig(sling.x, sling.y);
+  }
+});
+
+spawnLevel();
+gameLoop();
+</script>
+</body>
+</html>
